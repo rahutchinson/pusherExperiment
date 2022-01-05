@@ -1,9 +1,11 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pusher/pusher-http-go"
 )
 
 type Power string
@@ -27,10 +29,18 @@ type status struct {
 
 var things = []thing{
 	{ID: "338429", Name: "Ryan's", ThingType: "hovercraft", Status: status{TimeStamp: time.Now(), PowerStatus: On}},
-	{ID: "558429", Name: "Mario's", ThingType: "spaceship", Status: status{TimeStamp: time.Now(), PowerStatus: Off}},
+	{ID: "558429", Name: "Evgeny's", ThingType: "spaceship", Status: status{TimeStamp: time.Now(), PowerStatus: Off}},
 }
 
 func getThings(c *gin.Context) {
+	pusherClient := pusher.Client{
+		AppID:   "1326875",
+		Key:     "d718acf39c8c6bfdddc6",
+		Secret:  "d05fbeff194ba3e29a99",
+		Cluster: "us2",
+		Secure:  true,
+	}
+	pusherClient.Trigger("my-channel", "my-event", things)
 	c.IndentedJSON(http.StatusOK, things)
 }
 
@@ -57,8 +67,26 @@ func getThingById(c *gin.Context) {
 	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "that thang don't exist"})
 }
 
+func timePolling() {
+	pusherClient := pusher.Client{
+		AppID:   "1326875",
+		Key:     "d718acf39c8c6bfdddc6",
+		Secret:  "d05fbeff194ba3e29a99",
+		Cluster: "us2",
+		Secure:  true,
+	}
+	pusherClient.Trigger("my-channel", "my-event", things)
+}
+
 func main() {
 	router := gin.Default()
+
+	router.LoadHTMLGlob("templates/*")
+	router.GET("/index", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{
+			"title": "Main website",
+		})
+	})
 
 	router.GET("/things", getThings)
 	router.GET("/things/:id", getThingById)
@@ -67,5 +95,8 @@ func main() {
 	err := router.Run("localhost:8080")
 	if err != nil {
 		return
+	}
+	for range time.Tick(time.Second * 10) {
+		timePolling()
 	}
 }
